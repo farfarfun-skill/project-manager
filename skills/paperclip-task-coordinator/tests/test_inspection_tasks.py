@@ -69,9 +69,19 @@ class InspectionTaskTests(unittest.TestCase):
 
         url = opened.call_args.args[0].full_url
         self.assertIn("status=", url)
+        self.assertIn("limit=1000", url)
         self.assertNotIn("assigneeAgentId", url)
 
-    def test_ensure_reuses_daily_task_and_assigns_it_to_cto(self):
+    def test_http_issue_query_reads_every_page(self):
+        client = PaperclipClient("https://paperclip.example", "RUN-1", None, 5)
+        first_page = [{"id": f"I-{index}"} for index in range(1000)]
+        with patch.object(client, "request", side_effect=[first_page, [{"id": "I-1000"}]]) as requested:
+            issues = client.list_issues("C-1")
+
+        self.assertEqual(1001, len(issues))
+        self.assertIn("offset=1000", requested.call_args_list[1].args[1])
+
+    def test_ensure_reuses_daily_task_without_changing_owner(self):
         existing = daily()
         existing["assigneeAgentId"] = "OTHER"
         client = FakeClient([month(), existing])
@@ -79,8 +89,24 @@ class InspectionTaskTests(unittest.TestCase):
         result = ensure_tasks(client, "C-1", "G-1", "COORD", "CTO", date(2026, 8, 21))
 
         self.assertEqual("D-1", result["reportTaskId"])
-        self.assertEqual("CTO", client.get_issue("D-1")["assigneeAgentId"])
+        self.assertEqual("OTHER", client.get_issue("D-1")["assigneeAgentId"])
         self.assertEqual([], client.created)
+
+    def test_ensure_never_recreates_same_titled_tasks_with_wrong_structure(self):
+        existing_month = month()
+        existing_month["goalId"] = "OTHER"
+        existing_daily = daily(parent_id="OTHER")
+        existing_daily["goalId"] = "OTHER"
+        client = FakeClient([existing_month, existing_daily])
+
+        result = ensure_tasks(client, "C-1", "G-1", "COORD", "CTO", date(2026, 8, 21))
+
+        self.assertEqual("M-1", result["monthlyTaskId"])
+        self.assertEqual("D-1", result["dailyTaskId"])
+        self.assertEqual([], client.created)
+        self.assertEqual("G-1", client.get_issue("M-1")["goalId"])
+        self.assertEqual("M-1", client.get_issue("D-1")["parentId"])
+        self.assertEqual("G-1", client.get_issue("D-1")["goalId"])
 
     def test_ensure_creates_each_task_once_and_completes_month(self):
         client = FakeClient()
@@ -92,6 +118,13 @@ class InspectionTaskTests(unittest.TestCase):
         self.assertEqual(first["monthlyTaskId"], second["monthlyTaskId"])
         self.assertEqual(first["dailyTaskId"], second["dailyTaskId"])
         self.assertEqual("done", client.get_issue(first["monthlyTaskId"])["status"])
+        daily_task = client.get_issue(first["dailyTaskId"])
+        self.assertEqual("CTO", daily_task["assigneeAgentId"])
+        self.assertIn("立即将本任务转交给任务协调员（Agent ID: COORD）", daily_task["description"])
+        self.assertEqual("paperclip-task-coordinator:month:2026-08", client.created[0]["idempotencyKey"])
+        self.assertEqual("paperclip-task-coordinator:day:2026-08-21", client.created[1]["idempotencyKey"])
+        self.assertFalse(client.created[0]["allowDuplicate"])
+        self.assertFalse(client.created[1]["allowDuplicate"])
 
     def test_duplicate_daily_tasks_use_oldest_valid_parent(self):
         client = FakeClient([

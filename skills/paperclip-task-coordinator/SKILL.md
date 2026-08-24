@@ -24,7 +24,9 @@ description: Coordinate periodic Paperclip heartbeats by fetching unfinished tas
 
 日/月任务的查找、创建、去重选择、历史日任务完成和月任务状态修正只能通过脚本执行：
 
-canonical 日任务的 owner 固定为当前公司的 CTO Agent。`--cto-agent-id` 必须传真实 CTO Agent ID，不得传任务协调员、wake issue assignee 或占位值；无法确认 CTO Agent ID 时停止创建日任务并报告配置 blocker。脚本会把既有 canonical 日任务的错误 owner 修复为 CTO 并回读验证。
+同一公司内，完整标题相同的月任务或日任务绝不允许再次创建。只要公司级全状态分页搜索命中同名任务，即使其 goal、parent 或 owner 错误也必须复用并按契约修复，禁止再次 POST。脚本创建时使用按月份或日期固定的 Paperclip `idempotencyKey`、`allowDuplicate=false` 和同机互斥锁；不得绕过脚本直接调用创建接口。
+
+canonical 日任务仅在创建时指派给当前公司的 CTO Agent，任务正文会要求 CTO 立即转交给任务协调员。`--cto-agent-id` 必须传真实 CTO Agent ID，不得传任务协调员、wake issue assignee 或占位值；无法确认 CTO Agent ID 时停止创建日任务并报告配置 blocker。后续巡检保留日任务的当前 owner，不得改回 CTO。
 
 ```bash
 python3 scripts/inspection_tasks.py ensure \

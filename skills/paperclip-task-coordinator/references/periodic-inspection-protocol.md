@@ -4,7 +4,7 @@
 
 ## 日月任务
 
-按当前日期计算 `YYYY-MM` 和 `YYYY-MM-DD`。日/月任务解析必须使用公司级 issue 列表，覆盖包括 `done`、`cancelled` 在内的全部状态，并使用完整标题精确匹配。不得携带当前协调员的 `assigneeAgentId` 过滤条件，因为日任务 owner 是 CTO；按 assignee 查询会漏掉已存在的日任务并导致重复创建。
+按当前日期计算 `YYYY-MM` 和 `YYYY-MM-DD`。日/月任务解析必须分页读取完整的公司级 issue 列表，覆盖包括 `done`、`cancelled` 在内的全部状态，并使用完整标题精确匹配。不得携带 `assigneeAgentId` 过滤条件，因为日任务会从 CTO 转交给任务协调员；按 assignee 查询或只读第一页都会漏掉已存在的任务并导致重复创建。
 
 - 月度容器标题：`任务巡查YYYY-MM`
 - 日度任务标题：`任务巡查YYYY-MM-DD`
@@ -14,17 +14,17 @@
 | 任务 | Owner | 用途 | 任务协调员可写内容 |
 | --- | --- | --- | --- |
 | 月度容器 | 任务协调员 | 当月容器和日任务父任务 | 创建即 `done`；随后只读，不得写评论、附件、日常状态或巡查结论 |
-| 日度任务 | CTO | 当日巡查和技术执行 | 当天写巡查结果；当天最后一次 heartbeat 或下一自然日置为 `done` |
+| 日度任务 | 创建时 CTO，随后任务协调员 | 当日巡查和技术执行 | 当天写巡查结果；当天最后一次 heartbeat 或下一自然日置为 `done` |
 
 每次 heartbeat 只运行一次 `inspection_tasks.py ensure`。脚本必须满足：
 
-1. 公司级精确搜索当月容器。存在多个时按 `createdAt` 升序、任务 ID 升序选择第一个作为 canonical 月任务，记录其他 ID，不创建平行月任务；不存在时创建一次，owner 为任务协调员、status 为 `done`，并回读 goal、owner 和状态。若创建接口未接受 `done`，只允许紧接创建执行一次状态 PATCH 到 `done` 并再次回读；此后月任务冻结。
+1. 公司级精确搜索当月容器。任何 goal 下只要存在同名任务就不得再次 POST；优先选择 goal 正确的候选，再按 `createdAt` 升序、任务 ID 升序确定 canonical 月任务并记录其他 ID。完全不存在时使用 `idempotencyKey=paperclip-task-coordinator:month:YYYY-MM` 和 `allowDuplicate=false` 创建一次，owner 为任务协调员、status 为 `done`，并回读 goal、owner 和状态。若创建接口未接受 `done`，只允许紧接创建执行一次状态 PATCH 到 `done` 并再次回读；此后月任务冻结。
 2. 固定 `monthlyTaskId` 后，公司级精确搜索当天标题，不限定 assignee，不排除终态。先选择 `parentId == monthlyTaskId` 且 `goalId` 正确的候选，再按 `createdAt` 升序、任务 ID 升序选第一个作为 canonical 日任务。只要存在任一精确标题候选，本轮就不得 POST 新日任务。
-3. 没有任何精确标题候选时，脚本在同机互斥锁内最多调用一次创建接口，设置 `parentId=monthlyTaskId`、正确 `goalId`、owner=CTO、初始状态=`todo`。
+3. 没有任何精确标题候选时，脚本在同机互斥锁内最多调用一次创建接口，使用 `idempotencyKey=paperclip-task-coordinator:day:YYYY-MM-DD` 和 `allowDuplicate=false`，设置 `parentId=monthlyTaskId`、正确 `goalId`、owner=CTO、初始状态=`todo`，并在任务正文要求 CTO 立即将任务转交给任务协调员。
 4. 创建成功后立即重新执行公司级全状态精确搜索，再按上一步规则确定 `dailyTaskId`。即使创建响应已经返回 ID，也不得跳过复查后直接写评论。
 5. 创建复查或后续巡检发现多个候选时，始终只使用同一排序规则选出的 canonical 日任务。不要继续创建，也不要向其他重复任务写巡查结果；在 canonical 日任务中记录重复 ID 并报告 CTO。不要自动删除已有重复任务。
 6. 设置 `reportTaskId=dailyTaskId`。当前 wake issue 是月度容器时，月任务只作为触发源；禁止向它 POST 评论、附件、interaction、checkout、PATCH 或状态更新。
-7. 日任务的 `parentId`、owner 或 goal 不符合契约时，先回读并记录旧值，再对 canonical 日任务执行最小、低风险、可逆 PATCH，并回读验证。初始创建后的 status 不属于结构修复，不得仅为巡查而重开已经 `done` 或 `cancelled` 的日任务。已有 canonical 月任务若不是 `done`，只允许一次状态修正为 `done` 并回读；其他结构或字段异常只在日任务报告 CTO，不 PATCH 月任务。
+7. 日任务的 `parentId` 或 goal 不符合契约时，先回读并记录旧值，再对 canonical 日任务执行最小、低风险、可逆 PATCH，并回读验证。后续巡检保留日任务的当前 owner，不得改回 CTO。初始创建后的 status 不属于结构修复，不得仅为巡查而重开已经 `done` 或 `cancelled` 的日任务。已有 canonical 月任务若不是 `done`，只允许一次状态修正为 `done` 并回读；其他结构或字段异常只在日任务报告 CTO，不 PATCH 月任务。
 8. 日任务不存在或创建失败时不伪造日任务评论，也不得改写月任务作为替代。记录 API 响应、owner 和下一次重试条件；同类控制面写入连续失败两次后本轮停止重试。
 
 ## 写入目标断言

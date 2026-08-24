@@ -88,8 +88,13 @@ class PaperclipClient:
 
     def list_issues(self, company_id: str) -> list[dict]:
         company = urllib.parse.quote(company_id, safe="")
-        query = urllib.parse.urlencode({"status": STATUSES})
-        return unwrap_list(self.request("GET", f"/api/companies/{company}/issues?{query}"))
+        issues = []
+        while True:
+            query = urllib.parse.urlencode({"status": STATUSES, "limit": 1000, "offset": len(issues)})
+            page = unwrap_list(self.request("GET", f"/api/companies/{company}/issues?{query}"))
+            issues.extend(page)
+            if len(page) < 1000:
+                return issues
 
     def get_issue(self, issue_id: str) -> dict:
         issue = urllib.parse.quote(issue_id, safe="")
@@ -118,8 +123,8 @@ def issue_sort_key(issue: dict) -> tuple[str, str]:
 def select_month(issues: list[dict], goal_id: str, target_date: date) -> tuple[dict | None, list[str]]:
     title = f"任务巡查{target_date:%Y-%m}"
     matches = sorted(
-        (item for item in issues if item.get("title") == title and item.get("goalId") == goal_id),
-        key=issue_sort_key,
+        (item for item in issues if item.get("title") == title),
+        key=lambda item: (item.get("goalId") != goal_id, *issue_sort_key(item)),
     )
     return (matches[0] if matches else None, [issue_id(item) for item in matches[1:]])
 
@@ -128,8 +133,11 @@ def select_daily(
     issues: list[dict], goal_id: str, target_date: date, monthly_id: str
 ) -> tuple[dict | None, list[str]]:
     title = f"任务巡查{target_date:%Y-%m-%d}"
-    matches = [item for item in issues if item.get("title") == title and item.get("goalId") == goal_id]
-    matches.sort(key=lambda item: (item.get("parentId") != monthly_id, *issue_sort_key(item)))
+    matches = [item for item in issues if item.get("title") == title]
+    matches.sort(key=lambda item: (
+        item.get("parentId") != monthly_id or item.get("goalId") != goal_id,
+        *issue_sort_key(item),
+    ))
     return (matches[0] if matches else None, [issue_id(item) for item in matches[1:]])
 
 
@@ -378,6 +386,8 @@ def ensure_tasks(
             "status": "done",
             "assigneeAgentId": coordinator_agent_id,
             "goalId": goal_id,
+            "idempotencyKey": f"paperclip-task-coordinator:month:{target_date:%Y-%m}",
+            "allowDuplicate": False,
         })
         issues = client.list_issues(company_id)
         visible, duplicate_month_ids = select_month(issues, goal_id, target_date)
@@ -395,17 +405,18 @@ def ensure_tasks(
     if daily is None:
         daily = client.create_issue(company_id, {
             "title": f"任务巡查{target_date:%Y-%m-%d}",
-            "description": f"{target_date:%Y-%m-%d} 任务巡查记录。",
+            "description": f"{target_date:%Y-%m-%d} 任务巡查记录。CTO 收到后请立即将本任务转交给任务协调员（Agent ID: {coordinator_agent_id}），无需执行巡查。",
             "status": "todo",
             "assigneeAgentId": cto_agent_id,
             "parentId": monthly_id,
             "goalId": goal_id,
+            "idempotencyKey": f"paperclip-task-coordinator:day:{target_date:%Y-%m-%d}",
+            "allowDuplicate": False,
         })
         issues = client.list_issues(company_id)
         visible, duplicate_daily_ids = select_daily(issues, goal_id, target_date, monthly_id)
         daily = visible or daily
     daily = patch_changed(client, daily, {
-        "assigneeAgentId": cto_agent_id,
         "parentId": monthly_id,
         "goalId": goal_id,
     })
@@ -505,7 +516,7 @@ def main() -> int:
     ensure = subparsers.add_parser("ensure", help="Get or create canonical monthly and daily tasks")
     add_connection_arguments(ensure)
     ensure.add_argument("--coordinator-agent-id", default=env("PAPERCLIP_AGENT_ID"))
-    ensure.add_argument("--cto-agent-id", default=env("PAPERCLIP_CTO_AGENT_ID"), help="Current company CTO agent ID; canonical daily tasks are always assigned to it")
+    ensure.add_argument("--cto-agent-id", default=env("PAPERCLIP_CTO_AGENT_ID"), help="Current company CTO agent ID; new daily tasks are initially assigned to it for handoff")
 
     complete = subparsers.add_parser("complete-day", help="Mark the canonical daily task done")
     add_connection_arguments(complete)
