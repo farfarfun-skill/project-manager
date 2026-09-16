@@ -7,7 +7,7 @@
 - 项目名称：FarFarFun Project Governance
 - 项目简介：面向 Codex 的项目结构与研发全生命周期治理 Skill 集合
 - 项目负责人：FarFarFun
-- 代码仓库：https://gitee.com/farfarfun-skills/farfarfun--project-manager
+- 代码仓库：https://github.com/farfarfun-skill/project-manager
 
 ## 应用清单
 
