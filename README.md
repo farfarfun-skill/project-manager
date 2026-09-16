@@ -1,6 +1,6 @@
 # FarFarFun Project Governance
 
-面向 Codex 的项目治理 Skill 集合，将仓库结构、研发产物、Agent 执行边界和服务发布条件转化为可执行门禁。
+面向 Codex 的项目生命周期治理 Skill 集合，将仓库结构、研发产物和阶段门禁转化为可执行检查。
 
 ## Skills
 
@@ -8,12 +8,13 @@
 | --- | --- |
 | [`project-manager`](skills/project-manager/SKILL.md) | 检查 PRD、设计、技术方案、测试、发布和复盘产物，聚合生命周期门禁 |
 | [`project-structure-governance`](skills/project-structure-governance/SKILL.md) | 初始化并审计仓库目录、应用边界、文件命名和项目文档布局 |
-| [`isolate-paperclip-work`](skills/isolate-paperclip-work/SKILL.md) | 隔离 Paperclip 上下文，保护服务本身不被修改或停止，将核心门禁和 Agent 新权限申请形成可审计的董事会审批卡 |
-| [`paperclip-task-coordinator`](skills/paperclip-task-coordinator/SKILL.md) | 按任务和 Agent 维度生成未完成工作报表，校正状态与依赖，并拉起下一批可执行任务 |
-| [`service-release-governance`](skills/service-release-governance/SKILL.md) | 约束服务通过正式包发布、仓库安装和生产启动 |
-| [`bash-service-guide`](skills/bash-service-guide/SKILL.md) | 统一 Bash 服务生命周期脚本及开发、生产运行边界 |
 
 检查器统一输出 `allow`、`revise` 或 `block`。这些结果代表结构化产物是否达到对应门禁，不代替产品、技术、测试或发布负责人作最终业务决策。
+
+## 相关仓库
+
+- [`farfarfun-skill/paperclip-governance`](https://github.com/farfarfun-skill/paperclip-governance) — Paperclip 平台专属治理：`isolate-paperclip-work`、`paperclip-task-coordinator`
+- [`farfarfun-skill/service-governance`](https://github.com/farfarfun-skill/service-governance) — 服务工程规范：`service-release-governance`、`bash-service-guide`、`submodule-workspace-governance`
 
 ## Requirements
 
@@ -44,8 +45,6 @@ done
 ```text
 Use $project-structure-governance to audit this repository and return exact repair paths.
 Use $project-manager to check feature payment-confirmation at the development stage.
-Use $isolate-paperclip-work before changing files for this Paperclip assignment.
-Use $paperclip-task-coordinator to report unfinished work by task and agent, then wake executable tasks.
 ```
 
 也可以直接运行确定性检查器：
@@ -64,7 +63,7 @@ python3 scripts/feature_governance_check.py \
   --fail-on block
 ```
 
-Paperclip 内部 Agent 应先使用 `isolate-paperclip-work` 建立执行边界，再使用 `project-structure-governance` 检查仓库结构，最后由 `project-manager` 检查当前生命周期阶段的产物质量。
+Paperclip 内部 Agent 应先使用 `farfarfun-skill/paperclip-governance` 仓库中的 `isolate-paperclip-work` 建立执行边界，再使用本仓库的 `project-structure-governance` 检查仓库结构，最后由 `project-manager` 检查当前生命周期阶段的产物质量。
 
 ## Validation
 
@@ -73,7 +72,6 @@ python3 -m pip install -r skills/project-manager/requirements.txt
 
 (cd skills/project-manager && python3 -m unittest discover -s tests -v)
 (cd skills/project-structure-governance && python3 -m unittest discover -s tests -v)
-(cd skills/isolate-paperclip-work && python3 -m unittest discover -s tests -v)
 
 python3 skills/project-structure-governance/scripts/project_structure_checker.py \
   --workspace . \

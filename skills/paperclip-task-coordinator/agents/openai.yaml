@@ -1,4 +1,0 @@
-interface:
-  display_name: "Paperclip Task Coordinator"
-  short_description: "Report task and agent workload, then coordinate"
-  default_prompt: "Use $paperclip-task-coordinator to render deterministic task and agent workload reports, analyze unfinished work, and wake executable tasks."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Paperclip Project Hygiene"
-  short_description: "Keep Paperclip collaboration local and isolated"
-  default_prompt: "Use $isolate-paperclip-work to complete and verify collaborative engineering locally without public-network, cloud-device, release, deployment, or GitHub work."

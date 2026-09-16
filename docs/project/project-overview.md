@@ -19,7 +19,7 @@
 
 ## 项目目标
 
-- 将项目结构、研发产物、Agent 执行边界和服务发布条件转化为可复用的 Codex Skills 与确定性检查器。
+- 将项目结构和研发产物转化为可复用的 Codex Skills 与确定性检查器。
 - 为生命周期门禁统一提供 `allow`、`revise`、`block` 决策协议和可执行修复建议。
 
 ## 项目范围
@@ -28,13 +28,13 @@
 
 - Codex Skill 指令、参考规范、模板、检查器和自动化测试。
 - PRD、设计、开发、测试、发布、复盘和仓库结构治理。
-- 按任务和 Agent 维度生成未完成工作报表，校正状态和依赖，并拉起具备合法执行路径的任务。
-- Paperclip 执行隔离、服务不可变、低风险操作直行、核心门禁与 Agent 新权限申请的可审计董事会审批卡，以及生产服务发布和 Bash 生命周期约束。
 
 ### 范围外
 
 - 代替产品、技术、测试或发布负责人作最终业务决策。
 - 提供项目管理 SaaS、可视化控制台或在线文档托管服务。
+- Paperclip 平台专属治理（见 `farfarfun-skill/paperclip-governance` 仓库）。
+- 服务发布、Bash 生命周期脚本、多仓库子模块编排规范（见 `farfarfun-skill/service-governance` 仓库）。
 
 ## 重要约定
 
@@ -56,11 +56,12 @@
 - 项目结构索引：`.project-structure.json`
 - 生命周期治理：`skills/project-manager/SKILL.md`
 - 仓库结构治理：`skills/project-structure-governance/SKILL.md`
-- Agent 工作隔离：`skills/isolate-paperclip-work/SKILL.md`
-- 任务协调心跳：`skills/paperclip-task-coordinator/SKILL.md`
+- Paperclip 专属治理（另仓库）：`farfarfun-skill/paperclip-governance`
+- 服务工程规范（另仓库）：`farfarfun-skill/service-governance`
 
 ## 更新记录
 
 | 日期 | 修改人 | 变更摘要 |
 | --- | --- | --- |
 | 2026-08-10 | FarFarFun | 补齐仓库自身结构治理和项目说明 |
+| 2026-09-16 | FarFarFun | 拆分 Paperclip 治理与服务工程规范到独立仓库，范围收窄为通用项目生命周期治理 |
