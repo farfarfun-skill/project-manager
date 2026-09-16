@@ -79,7 +79,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Trigger daily-action Gitee sync
+      - name: Trigger action-daily Gitee sync
         env:
           GH_TOKEN: ${{ secrets.DAILY_ACTION_TOKEN }}
         run: |
@@ -90,5 +90,5 @@ jobs:
             --header "Authorization: Bearer $GH_TOKEN" \
             --header "Accept: application/vnd.github+json" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/farfarfun-skills/daily-action/actions/workflows/sync.yml/dispatches \
+            https://api.github.com/repos/farfarfun-skills/action-daily/actions/workflows/sync.yml/dispatches \
             --data '{"ref":"main"}'

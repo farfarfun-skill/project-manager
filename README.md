@@ -26,8 +26,8 @@
 ## Install
 
 ```bash
-git clone https://gitee.com/farfarfun-skills/farfarfun--project-manager.git
-cd farfarfun--project-manager
+git clone https://github.com/farfarfun-skill/project-manager.git
+cd project-manager
 python3 -m pip install -r skills/project-manager/requirements.txt
 
 mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
