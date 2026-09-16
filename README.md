@@ -8,6 +8,7 @@
 | --- | --- |
 | [`project-manager`](skills/project-manager/SKILL.md) | 检查 PRD、设计、技术方案、测试、发布和复盘产物，聚合生命周期门禁 |
 | [`project-structure-governance`](skills/project-structure-governance/SKILL.md) | 初始化并审计仓库目录、应用边界、文件命名和项目文档布局 |
+| [`github-repo-standards`](skills/github-repo-standards/SKILL.md) | 审计 README 结构，以及（可选）GitHub 仓库描述与 Topics |
 
 检查器统一输出 `allow`、`revise` 或 `block`。这些结果代表结构化产物是否达到对应门禁，不代替产品、技术、测试或发布负责人作最终业务决策。
 
@@ -45,6 +46,7 @@ done
 ```text
 Use $project-structure-governance to audit this repository and return exact repair paths.
 Use $project-manager to check feature payment-confirmation at the development stage.
+Use $github-repo-standards to audit this repository's README structure before publishing.
 ```
 
 也可以直接运行确定性检查器：

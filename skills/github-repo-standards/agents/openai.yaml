@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Repo Standards"
+  short_description: "Audit README structure and GitHub topics/description"
+  default_prompt: "Use $github-repo-standards to audit this repository's README structure and, optionally with --check-topics, its GitHub description and Topics."

@@ -27,6 +27,7 @@ Inspect the supplied artifact path and requested outcome, then select the narrow
 | Request or artifact | Module | Read before use |
 | --- | --- | --- |
 | Initialize or audit project document paths and language | `$project-structure-governance` | Use that skill's canonical layout |
+| Review or fix a repository's README structure, or its GitHub description/Topics | `$github-repo-standards` | Use that skill's [GitHub repo standard](../github-repo-standards/references/github-repo-standard.md) |
 | Create a new feature documentation skeleton | `feature-doc-bootstrap` | [New Demand Checklist](references/standards/new-demand-init-checklist.md) |
 | Create an event-scoped release record | `release-record-bootstrap` | [Release Template](references/templates/release-record-template.md) |
 | Review `docs/product/<feature>/` | `prd-qa-checker` | [PRD QA Rules](references/checkers/prd-qa-checker.md) |
