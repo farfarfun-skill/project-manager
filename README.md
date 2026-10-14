@@ -8,7 +8,7 @@
 | --- | --- |
 | [`project-manager`](skills/project-manager/SKILL.md) | 检查 PRD、设计、技术方案、测试、发布和复盘产物，聚合生命周期门禁 |
 | [`project-structure-governance`](skills/project-structure-governance/SKILL.md) | 初始化并审计仓库目录、应用边界、文件命名和项目文档布局 |
-| [`github-repo-standards`](skills/github-repo-standards/SKILL.md) | 审计 README 结构，以及（可选）GitHub 仓库描述与 Topics |
+| [`github-repo-standards`](skills/github-repo-standards/SKILL.md) | 审计默认分支命名与 README 结构，以及（可选）GitHub 仓库描述与 Topics |
 
 检查器统一输出 `allow`、`revise` 或 `block`。这些结果代表结构化产物是否达到对应门禁，不代替产品、技术、测试或发布负责人作最终业务决策。
 
@@ -81,3 +81,9 @@ python3 skills/project-structure-governance/scripts/project_structure_checker.py
 ```
 
 完整项目背景见 [`docs/project/project-overview.md`](docs/project/project-overview.md)。
+
+## 关于组织
+
+本仓库属于 [farfarfun-skill](https://github.com/farfarfun-skill) —— [farfarfun](https://github.com/farfarfun) 旗下的 AI Agent Skill 产品线子组织，也是全部自研 Skill 的源头。组织内各仓库分别聚焦一个治理域，把原本依赖人工评审的规范，转化为 Agent 可直接调用的确定性检查器与工作流；issue、PR 与规范变更均在此处提交。
+
+本仓库在其中负责项目全生命周期治理：仓库结构、各阶段研发产物，以及仓库对外呈现（README 与 GitHub 元信息）。要确认某个任务该用哪个 Skill，先查 [`skill-router`](https://github.com/farfarfun-skill/skill-router)；需要批量安装或通过 Gitee 访问，请前往镜像组织 [farfarfun-skills](https://github.com/farfarfun-skills)。
