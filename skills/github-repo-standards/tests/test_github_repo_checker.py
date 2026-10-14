@@ -1,3 +1,4 @@
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -20,11 +21,26 @@ pip install demo-project
 ```bash
 demo-project run --input data.csv
 ```
+
+## 关于组织
+
+本仓库属于 [acme](https://github.com/acme) 组织，该组织维护数据采集与分析方向的工具链。
 """
+
+
+FULL_METADATA = {
+    "defaultBranchRef": {"name": "master"},
+    "description": "把原始传感器导出转换为规范化时序记录的示例项目。",
+    "repositoryTopics": [{"name": name} for name in ("python", "cli", "etl", "sensors", "time-series")],
+}
 
 
 def write_readme(workspace: Path, content: str, name: str = "README.md") -> None:
     (workspace / name).write_text(content, encoding="utf-8")
+
+
+def init_repo(workspace: Path, branch: str) -> None:
+    subprocess.run(["git", "init", "-b", branch, str(workspace)], check=True, capture_output=True)
 
 
 class ReadmeChecksTests(unittest.TestCase):
@@ -91,6 +107,23 @@ class ReadmeChecksTests(unittest.TestCase):
             self.assertEqual("block", report["decision"])
             self.assertTrue(any(item["code"] == "readme.too_short" for item in report["findings"]))
 
+    def test_missing_org_section_revises(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_readme(workspace, VALID_README.split("## 关于组织")[0])
+            report = analyze(workspace, check_topics_flag=False)
+            self.assertEqual("revise", report["decision"])
+            self.assertTrue(any(item["code"] == "readme.org_section_missing" for item in report["findings"]))
+
+    def test_org_section_without_link_revises(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_readme(workspace, VALID_README.replace("[acme](https://github.com/acme) ", ""))
+            with patch("scripts.github_repo_checker.resolve_repo_slug", return_value="acme/demo-project"):
+                report = analyze(workspace, check_topics_flag=False)
+            self.assertEqual("revise", report["decision"])
+            self.assertTrue(any(item["code"] == "readme.org_link_missing" for item in report["findings"]))
+
     def test_lowercase_filename_revises(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -110,14 +143,18 @@ class TopicsChecksTests(unittest.TestCase):
             self.assertEqual("block", report["decision"])
             self.assertTrue(any(item["code"] == "repo.metadata_unavailable" for item in report["findings"]))
 
-    def test_insufficient_topics_revises(self) -> None:
+    def analyze_with_metadata(self, workspace: Path, **overrides) -> dict:
+        data = {**FULL_METADATA, **overrides}
+        with patch("scripts.github_repo_checker.resolve_repo_slug", return_value="acme/demo-project"), \
+             patch("scripts.github_repo_checker.run_gh_repo_view", return_value=data):
+            return analyze(workspace, check_topics_flag=True)
+
+    def test_four_topics_revise(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             write_readme(workspace, VALID_README)
-            data = {"description": "A demo project.", "repositoryTopics": [{"name": "python"}]}
-            with patch("scripts.github_repo_checker.resolve_repo_slug", return_value="acme/demo-project"), \
-                 patch("scripts.github_repo_checker.run_gh_repo_view", return_value=data):
-                report = analyze(workspace, check_topics_flag=True)
+            topics = FULL_METADATA["repositoryTopics"][:4]
+            report = self.analyze_with_metadata(workspace, repositoryTopics=topics)
             self.assertEqual("revise", report["decision"])
             self.assertTrue(any(item["code"] == "repo.topics_insufficient" for item in report["findings"]))
 
@@ -125,25 +162,60 @@ class TopicsChecksTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             write_readme(workspace, VALID_README)
-            data = {"description": "", "repositoryTopics": [{"name": "python"}, {"name": "cli"}, {"name": "etl"}]}
-            with patch("scripts.github_repo_checker.resolve_repo_slug", return_value="acme/demo-project"), \
-                 patch("scripts.github_repo_checker.run_gh_repo_view", return_value=data):
-                report = analyze(workspace, check_topics_flag=True)
+            report = self.analyze_with_metadata(workspace, description="")
             self.assertEqual("revise", report["decision"])
             self.assertTrue(any(item["code"] == "repo.description_missing" for item in report["findings"]))
+
+    def test_english_description_revises(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_readme(workspace, VALID_README)
+            report = self.analyze_with_metadata(workspace, description="A demo project.")
+            self.assertEqual("revise", report["decision"])
+            self.assertTrue(any(item["code"] == "repo.description_language" for item in report["findings"]))
+
+    def test_remote_default_branch_main_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_readme(workspace, VALID_README)
+            report = self.analyze_with_metadata(workspace, defaultBranchRef={"name": "main"})
+            self.assertEqual("block", report["decision"])
+            self.assertTrue(any(item["code"] == "repo.default_branch" for item in report["findings"]))
 
     def test_full_metadata_allows(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             write_readme(workspace, VALID_README)
-            data = {
-                "description": "A demo project.",
-                "repositoryTopics": [{"name": "python"}, {"name": "cli"}, {"name": "etl"}],
-            }
-            with patch("scripts.github_repo_checker.resolve_repo_slug", return_value="acme/demo-project"), \
-                 patch("scripts.github_repo_checker.run_gh_repo_view", return_value=data):
-                report = analyze(workspace, check_topics_flag=True)
+            report = self.analyze_with_metadata(workspace)
             self.assertEqual("allow", report["decision"])
+            self.assertEqual([], report["findings"])
+
+
+class DefaultBranchChecksTests(unittest.TestCase):
+    def test_master_branch_allows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            init_repo(workspace, "master")
+            write_readme(workspace, VALID_README)
+            report = analyze(workspace, check_topics_flag=False)
+            self.assertEqual("allow", report["decision"])
+
+    def test_main_branch_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            init_repo(workspace, "main")
+            write_readme(workspace, VALID_README)
+            report = analyze(workspace, check_topics_flag=False)
+            self.assertEqual("block", report["decision"])
+            self.assertTrue(any(item["code"] == "repo.default_branch" for item in report["findings"]))
+
+    def test_non_git_workspace_skips_branch_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_readme(workspace, VALID_README)
+            report = analyze(workspace, check_topics_flag=False)
+            self.assertEqual("allow", report["decision"])
+            self.assertFalse(any("默认分支" in item for item in report["passes"]))
 
 
 if __name__ == "__main__":
