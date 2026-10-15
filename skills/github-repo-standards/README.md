@@ -5,7 +5,8 @@
 ## 功能
 
 - 检查默认分支是否为 `master`（本地依据 `origin/HEAD` 推断，非 git 目录跳过）。
-- 检查 README 是否有一级标题、非徽章的简介段落、安装/使用类章节、组织介绍章节（需链接组织主页）。
+- 检查 README 是否有一级标题、非徽章的简介段落、安装/使用类章节。
+- 检查组织介绍章节：标题写成 `## 关于 <组织名>`（规范钉死的写法）或 `## 关于组织`、`## Organization`、`## About Us` 等，整行判定，功能标题里凑巧出现「组织」`organization` 不算；正文还要给出裸组织主页链接 `https://github.com/<owner>`，兄弟仓库地址顶替不了（缺标题报 `readme.org_section_missing`，缺链接报 `readme.org_link_missing`）。
 - 检查 README 是否内容过短，或残留模板占位符（`lorem ipsum`、`coming soon`、`<repo-name>`、`<your-repo>`，判为 block）。
 - 检查 README 散文里行首的大写 `TODO`/`TBD` 标记（判为 revise）：小写标识符（如 `todo-list`）、代码、链接和裸 URL 里的一律不算，`## TODO` 路线图小节不会拦住发布。
 - 可选：通过 `gh repo view` 检查默认分支、仓库描述（必须使用中文）和 Topics 数量（至少 5 个）；需要 `gh` 已登录，默认不开启，避免影响 CI。

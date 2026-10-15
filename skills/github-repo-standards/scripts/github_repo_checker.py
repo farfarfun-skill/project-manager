@@ -9,9 +9,22 @@ USAGE_SECTION_RE = re.compile(
     r"^#{2,3}\s*.*(install|安装|quick start|快速开始|usage|使用|getting started).*$",
     re.IGNORECASE | re.MULTILINE,
 )
+# 组织介绍章节的标题。整行锚定，而不是「标题里出现关键词就算」：功能标题
+# （`## Sync organization forks & mirror to Gitee`）和看板标题（`## P2-1 开源协议 —— 已全组织统一 MIT`）
+# 里恰好出现这些词时不该蒙过。同时认两种合规写法：`## 关于 <组织名>` 与 `## 关于组织`。
+# 标题里的组织名不要求等于 owner——写错组织的仓库应该由下面的链接检查报出来，
+# 而不是被当成「没有组织章节」。
 ORG_SECTION_RE = re.compile(
-    r"^#{2,3}\s*.*(组织|organization|关于我们|about us).*$",
-    re.IGNORECASE | re.MULTILINE,
+    r"""^\#{2,3}[^\S\n]*                  # 二级或三级标题标记
+        (?:[^\w\s]+[^\S\n]*)*             # emoji、编号符号等装饰
+        (?:                               # 组织章节标题的几种写法
+            关于[^\S\n]*(?:我们|[A-Za-z0-9][\w.\-]*[^\S\n]*)?(?:本?组织)?
+          | 组织(?:介绍|简介)?
+          | about[^\S\n]+(?:the|our)?[^\S\n]*[A-Za-z0-9][\w.\-]*
+          | organi[sz]ation
+        )
+        [^\S\n]*[:：]?[^\S\n]*$""",
+    re.IGNORECASE | re.MULTILINE | re.VERBOSE,
 )
 # 未定制的模板残留，没有歧义，命中即 block。保留大小写不敏感：`Lorem Ipsum` 同样是残留。
 PLACEHOLDER_RE = re.compile(r"lorem ipsum|coming soon|<repo-name>|<your-repo>", re.IGNORECASE)
@@ -161,21 +174,37 @@ def check_readme(workspace: Path, findings: list[dict], passes: list[str]) -> No
         ))
 
 
+def org_home_link_re(owner: str) -> re.Pattern[str]:
+    """owner 的组织主页链接。
+
+    `github.com/<owner>` 后面不能再跟路径段，否则兄弟仓库的 clone 地址
+    （`github.com/farfarfun/funread-api`）会顶替组织主页蒙过检查。owner 含
+    `-`，必须转义后再拼进正则。
+    """
+    return re.compile(rf"github\.com/{re.escape(owner)}/?(?![\w\-/])", re.IGNORECASE)
+
+
 def check_org_section(workspace: Path, text: str, relative: str, findings: list[dict], passes: list[str]) -> None:
-    """README 必须介绍所属组织：既要有组织章节，也要给出组织主页链接。"""
+    """README 必须介绍所属组织：组织章节标题与组织主页链接两半都要有。
+
+    只有标题不算（功能标题里恰好出现 `organization`），只有链接也不算
+    （兄弟仓库地址恰好包含 `github.com/<owner>`）。
+    """
     if not ORG_SECTION_RE.search(text):
         findings.append(finding(
             "revise", "readme.org_section_missing", relative,
-            "README 缺少组织介绍章节（如 `## 关于组织`），请补充所属组织的定位与仓库在其中的位置。",
+            "README 缺少组织介绍章节（如 `## 关于 farfarfun` 或 `## 关于组织`），"
+            "请补充所属组织的定位与仓库在其中的位置。",
         ))
         return
 
     slug = resolve_repo_slug(workspace)
     owner = slug.split("/", 1)[0] if slug else None
-    if owner and f"github.com/{owner}" not in text:
+    if owner and not org_home_link_re(owner).search(text):
         findings.append(finding(
             "revise", "readme.org_link_missing", relative,
-            f"组织介绍未链接到组织主页 https://github.com/{owner}，请补充链接。",
+            f"组织介绍未链接到组织主页 https://github.com/{owner}，请补充链接"
+            "（仓库链接不算，必须是组织主页本身）。",
         ))
         return
     passes.append(f"README 包含组织介绍：{relative}")

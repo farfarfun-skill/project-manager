@@ -28,6 +28,22 @@ demo-project run --input data.csv
 """
 
 
+README_WITHOUT_ORG_SECTION = VALID_README.split("## 关于组织")[0]
+
+# 规范钉死的组织介绍区块写法：标题是 `## 关于 <组织名>`，正文给出组织主页链接。
+SPEC_ORG_BLOCK = """---
+
+## 关于 acme
+
+[acme](https://github.com/acme) 是一个专注于实用工具库的开源组织，涵盖数据采集、分析与开发工具链等方向。
+
+- 🏠 组织主页：<https://github.com/acme>
+- 📧 联系：acme@example.com
+
+本项目基于 [MIT](LICENSE) 协议开源。
+"""
+
+
 FULL_METADATA = {
     "defaultBranchRef": {"name": "master"},
     "description": "把原始传感器导出转换为规范化时序记录的示例项目。",
@@ -194,6 +210,65 @@ class ReadmeChecksTests(unittest.TestCase):
                 report = analyze(workspace, check_topics_flag=False)
             self.assertEqual("revise", report["decision"])
             self.assertTrue(any(item["code"] == "readme.org_link_missing" for item in report["findings"]))
+
+    def analyze_org_section(self, section: str, slug: str = "acme/demo-project") -> dict:
+        """把给定的组织介绍段落接在 README 末尾，按 slug 的 owner 判定。"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_readme(workspace, README_WITHOUT_ORG_SECTION + section)
+            with patch("scripts.github_repo_checker.resolve_repo_slug", return_value=slug):
+                return analyze(workspace, check_topics_flag=False)
+
+    def assert_org_code(self, section: str, code: str | None, slug: str = "acme/demo-project") -> None:
+        report = self.analyze_org_section(section, slug)
+        org_codes = [item["code"] for item in report["findings"] if item["code"].startswith("readme.org")]
+        self.assertEqual([code] if code else [], org_codes)
+
+    def test_spec_org_block_is_clean(self) -> None:
+        """规范要求逐字复制的区块：标题 `## 关于 <组织名>`，不含「组织」二字也要认。"""
+        self.assert_org_code(SPEC_ORG_BLOCK, None)
+
+    def test_legacy_org_heading_is_clean(self) -> None:
+        """旧写法 `## 关于组织` 仍然合规，不逼已经写好的仓库返工。"""
+        self.assert_org_code(
+            "## 关于组织\n\n本仓库属于 [acme](https://github.com/acme) 组织，该组织维护数据方向的工具链。\n",
+            None,
+        )
+
+    def test_org_heading_named_after_owning_org_is_clean(self) -> None:
+        """子组织仓库用自己的组织名写标题和链接。"""
+        self.assert_org_code(
+            "## 关于 acme-drive\n\n本仓库属于 [acme-drive](https://github.com/acme-drive)，负责网盘方向。\n",
+            None,
+            slug="acme-drive/demo-project",
+        )
+
+    def test_org_section_pointing_at_other_org_revises(self) -> None:
+        """标题写对了但链接指向别的组织：是链接缺失，不是章节缺失。"""
+        self.assert_org_code(SPEC_ORG_BLOCK, "readme.org_link_missing", slug="acme-drive/demo-project")
+
+    def test_org_section_with_only_repo_link_revises(self) -> None:
+        """组织主页链接不能用本仓库或兄弟仓库的地址顶替。"""
+        self.assert_org_code(
+            "## 关于 acme\n\n本仓库属于 acme，另见 [acme/other-repo](https://github.com/acme/other-repo)。\n",
+            "readme.org_link_missing",
+        )
+
+    def test_sibling_repo_links_without_org_section_revises(self) -> None:
+        """只有兄弟仓库链接、没有组织章节：报章节缺失，不该因为凑巧含 owner 子串而通过。"""
+        self.assert_org_code(
+            "## 相关仓库\n\n```bash\ngit clone https://github.com/acme/demo-project.git\n```\n\n"
+            "数据源见 [acme/other-repo](https://github.com/acme/other-repo)。\n",
+            "readme.org_section_missing",
+        )
+
+    def test_functional_heading_mentioning_organization_revises(self) -> None:
+        """功能标题里凑巧出现 `organization`，正文也有组织主页链接，仍然不算组织介绍。"""
+        self.assert_org_code(
+            "## Sync organization forks & mirror to Gitee\n\n"
+            "同步 [acme](https://github.com/acme) 下所有 fork，无需手动触发。\n",
+            "readme.org_section_missing",
+        )
 
     def test_lowercase_filename_revises(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
