@@ -91,13 +91,84 @@ class ReadmeChecksTests(unittest.TestCase):
             self.assertEqual("revise", report["decision"])
             self.assertTrue(any(item["code"] == "readme.usage_section_missing" for item in report["findings"]))
 
-    def test_placeholder_blocks(self) -> None:
+    def assert_readme_clean(self, extra: str) -> None:
+        """README 追加这段内容后不应产生任何问题。"""
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
-            write_readme(workspace, VALID_README + "\nTODO: write more docs.\n")
+            write_readme(workspace, VALID_README + extra)
+            report = analyze(workspace, check_topics_flag=False)
+            self.assertEqual([], report["findings"])
+
+    def assert_placeholder_blocks(self, extra: str) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_readme(workspace, VALID_README + extra)
             report = analyze(workspace, check_topics_flag=False)
             self.assertEqual("block", report["decision"])
             self.assertTrue(any(item["code"] == "readme.placeholder" for item in report["findings"]))
+
+    def assert_todo_marker_revises(self, extra: str) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_readme(workspace, VALID_README + extra)
+            report = analyze(workspace, check_topics_flag=False)
+            self.assertEqual("revise", report["decision"])
+            self.assertTrue(any(item["code"] == "readme.todo_marker" for item in report["findings"]))
+
+    def test_todo_list_tracking_link_is_clean(self) -> None:
+        """本组织惯例：README 链到 todo-list 仓库跟踪需求，不是「README 没写完」。"""
+        self.assert_readme_clean(
+            "\n需求与缺陷在 [farfarfun/todo-list](https://github.com/farfarfun/todo-list/issues) 跟踪。\n"
+        )
+
+    def test_lowercase_todo_identifier_is_clean(self) -> None:
+        """占位符语义靠大写表达，行首的小写标识符不该命中。"""
+        self.assert_readme_clean("\ntodo-list 仓库负责汇总本仓库的待办事项。\n")
+
+    def test_uppercase_todo_in_link_is_clean(self) -> None:
+        """链接文字和链接目标都指向真实存在的文档。"""
+        self.assert_readme_clean("\n已知待优化项见 [docs/TODO.md](docs/TODO.md)。\n")
+
+    def test_uppercase_todo_in_inline_code_is_clean(self) -> None:
+        self.assert_readme_clean("\n待办清单维护在 `docs/TODO.md` 里。\n")
+
+    def test_uppercase_todo_in_bare_url_is_clean(self) -> None:
+        self.assert_readme_clean("\n看板：https://github.com/acme/TODO-board/projects/1\n")
+
+    def test_uppercase_todo_in_code_block_is_clean(self) -> None:
+        """代码示例里的 TODO 注释是示例的一部分，不是 README 的坑。"""
+        self.assert_readme_clean("\n```python\n# TODO: 这里留给调用方扩展\npass\n```\n")
+
+    def test_uppercase_todo_mid_sentence_is_clean(self) -> None:
+        """只有行首标记位才是占位符，句子中间提到 TODO 是在讲这件事本身。"""
+        self.assert_readme_clean("\nAll TODO items are tracked in the issue tracker, not in this file.\n")
+
+    def test_todo_heading_revises(self) -> None:
+        """`## TODO` 当路线图小节是常见写法，值得确认但不该拦住发布。"""
+        self.assert_todo_marker_revises("\n## TODO\n\n- 补充性能基准\n")
+
+    def test_todo_prose_marker_revises(self) -> None:
+        self.assert_todo_marker_revises("\nTODO: write more docs.\n")
+
+    def test_template_placeholder_in_code_block_blocks(self) -> None:
+        """代码块不豁免：未定制的模板最常残留在安装命令里。"""
+        self.assert_placeholder_blocks(
+            "\n```bash\ngit clone https://github.com/acme/<repo-name>.git\ncd <repo-name>\n```\n"
+        )
+
+    def test_template_placeholder_in_prose_blocks(self) -> None:
+        self.assert_placeholder_blocks("\n把 <your-repo> 替换成你自己的仓库名。\n")
+
+    def test_coming_soon_blocks(self) -> None:
+        """这几个词没有歧义，大小写都算残留。"""
+        self.assert_placeholder_blocks("\n## Benchmarks\n\nComing soon.\n")
+
+    def test_lorem_ipsum_blocks(self) -> None:
+        self.assert_placeholder_blocks("\nLorem ipsum dolor sit amet, consectetur adipiscing elit.\n")
+
+    def test_template_placeholder_in_inline_code_is_clean(self) -> None:
+        """只有讨论这个写法本身时才会把它写进行内代码。"""
+        self.assert_readme_clean("\n检查器会拦下 README 里残留的 `<repo-name>` 字样。\n")
 
     def test_too_short_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

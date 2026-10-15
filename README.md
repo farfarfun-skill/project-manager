@@ -74,6 +74,7 @@ python3 -m pip install -r skills/project-manager/requirements.txt
 
 (cd skills/project-manager && python3 -m unittest discover -s tests -v)
 (cd skills/project-structure-governance && python3 -m unittest discover -s tests -v)
+(cd skills/github-repo-standards && python3 -m unittest discover -s tests -v)
 
 python3 skills/project-structure-governance/scripts/project_structure_checker.py \
   --workspace . \

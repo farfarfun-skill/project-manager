@@ -13,10 +13,18 @@ ORG_SECTION_RE = re.compile(
     r"^#{2,3}\s*.*(组织|organization|关于我们|about us).*$",
     re.IGNORECASE | re.MULTILINE,
 )
-PLACEHOLDER_RE = re.compile(
-    r"\bTODO\b|\bTBD\b|lorem ipsum|coming soon|<repo-name>|<your-repo>",
-    re.IGNORECASE,
-)
+# 未定制的模板残留，没有歧义，命中即 block。保留大小写不敏感：`Lorem Ipsum` 同样是残留。
+PLACEHOLDER_RE = re.compile(r"lorem ipsum|coming soon|<repo-name>|<your-repo>", re.IGNORECASE)
+# TODO/TBD 有歧义：既可能是没写完的坑，也可能是真实存在的东西的名字（仓库 `todo-list`、
+# 文档 `docs/TODO.md`），还可能是一个照常维护的路线图小节标题。所以收窄三道：
+# 只认全大写（占位符语义本来就靠大写表达，`todo-list` 这种小写标识符不算）；代码、链接、
+# 裸 URL 里的放过（指向的是真实存在的东西）；只认行首标记位，前面只允许 `#`/`-`/`>`/emoji
+# 这类装饰，`## 📋 TODO` 算，句子中间提到 TODO 不算。命中按 revise 报而不是 block。
+TODO_MARKER_RE = re.compile(r"^[^A-Za-z一-鿿]*(TODO|TBD)\b", re.MULTILINE)
+FENCED_CODE_RE = re.compile(r"^ {0,3}(```|~~~).*?(?:^ {0,3}\1|\Z)", re.MULTILINE | re.DOTALL)
+INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+MARKDOWN_LINK_RE = re.compile(r"\[[^\]\n]*\]\(\s*[^)\s]*(?:\s+\"[^\"]*\")?\s*\)")
+AUTOLINK_RE = re.compile(r"<?https?://\S+>?")
 BADGE_LINE_RE = re.compile(r"^\s*(\[!\[|<img\b)", re.IGNORECASE)
 CJK_RE = re.compile(r"[一-鿿]")
 MIN_README_LENGTH = 200
@@ -28,6 +36,39 @@ DEFAULT_BRANCH_CODE = "repo.default_branch"
 
 def finding(severity: str, code: str, path: str, message: str) -> dict:
     return {"severity": severity, "code": code, "path": path, "message": message}
+
+
+def blank_out(pattern: re.Pattern[str], text: str) -> str:
+    """把匹配到的片段换成等长空白，换行保留。
+
+    不直接删掉是为了让后续匹配的位置、行号和行首锚点仍然对应原文。
+    """
+    return pattern.sub(lambda match: re.sub(r"[^\n]", " ", match.group(0)), text)
+
+
+def find_placeholder(text: str) -> str | None:
+    """返回 README 里第一个模板占位符，没有则 None。
+
+    只豁免行内代码——介绍本规范的 README 得能引用这些写法本身。代码块不豁免：
+    `git clone .../<repo-name>.git` 正是未定制模板最典型的残留位置。
+    """
+    outside_fences = blank_out(FENCED_CODE_RE, text)
+    chunks = [blank_out(INLINE_CODE_RE, outside_fences)]
+    chunks.extend(match.group(0) for match in FENCED_CODE_RE.finditer(text))
+    for chunk in chunks:
+        match = PLACEHOLDER_RE.search(chunk)
+        if match:
+            return match.group(0)
+    return None
+
+
+def find_todo_marker(text: str) -> str | None:
+    """返回 README 散文里第一个 TODO/TBD 标记，没有则 None。"""
+    prose = text
+    for pattern in (FENCED_CODE_RE, INLINE_CODE_RE, MARKDOWN_LINK_RE, AUTOLINK_RE):
+        prose = blank_out(pattern, prose)
+    match = TODO_MARKER_RE.search(prose)
+    return match.group(1) if match else None
 
 
 def git_output(workspace: Path, *args: str) -> str | None:
@@ -105,11 +146,18 @@ def check_readme(workspace: Path, findings: list[dict], passes: list[str]) -> No
 
     check_org_section(workspace, text, relative, findings, passes)
 
-    placeholder = PLACEHOLDER_RE.search(text)
+    placeholder = find_placeholder(text)
     if placeholder:
         findings.append(finding(
             "block", "readme.placeholder", relative,
-            f"README 中残留占位符文本：{placeholder.group(0)!r}，请替换为真实内容。",
+            f"README 中残留模板占位符：{placeholder!r}，请替换为真实内容。",
+        ))
+
+    todo_marker = find_todo_marker(text)
+    if todo_marker:
+        findings.append(finding(
+            "revise", "readme.todo_marker", relative,
+            f"README 中有 {todo_marker!r} 标记，请确认它是对外维护的路线图而不是没写完的段落。",
         ))
 
 
