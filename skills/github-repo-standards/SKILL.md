@@ -1,6 +1,6 @@
 ---
 name: github-repo-standards
-description: Audit a repository's GitHub-facing presentation — default branch naming (`master`), README structure (title, description paragraph, install/usage section, organization section, no placeholder text, minimum length) and discoverability metadata (Chinese repository description and at least 5 Topics via `gh repo view`). Use when Codex needs to review or fix a README before publishing, or verify a public repo's default branch, Topics and description are set for discoverability. Use project-structure-governance instead for internal file placement and naming.
+description: Audit a repository's GitHub-facing presentation — default branch naming (`master`), README structure (title, description paragraph, install/usage section, organization section, no template placeholder text, minimum length) and discoverability metadata (Chinese repository description and at least 5 Topics via `gh repo view`). Use when Codex needs to review or fix a README before publishing, or verify a public repo's default branch, Topics and description are set for discoverability. Use project-structure-governance instead for internal file placement and naming.
 ---
 
 # GitHub Repo Standards
@@ -15,7 +15,7 @@ Run from this skill directory:
 python3 scripts/github_repo_checker.py --workspace /path/to/repo --fail-on revise
 ```
 
-This checks `README.md` plus the default branch: the README needs an `# ` title, a non-badge description paragraph near the top, an install/usage section, an organization section linking to `https://github.com/<owner>`, no leftover placeholder text (`TODO`, `TBD`, `Lorem ipsum`, `<repo-name>`, ...), and a sane minimum length; the default branch must be `master`, inferred from the local clone (`origin/HEAD`, else the presence of a `master` branch, else the current branch) and skipped outside a git repository. It never touches the network.
+This checks `README.md` plus the default branch: the README needs an `# ` title, a non-badge description paragraph near the top, an install/usage section, an organization section linking to `https://github.com/<owner>`, no leftover template placeholder (`lorem ipsum`, `coming soon`, `<repo-name>`, `<your-repo>`), and a sane minimum length; an upper-case `TODO`/`TBD` marker at the start of a line outside code and links is reported at `revise` rather than `block`, because a published `## TODO` roadmap is legitimate; the default branch must be `master`, inferred from the local clone (`origin/HEAD`, else the presence of a `master` branch, else the current branch) and skipped outside a git repository. It never touches the network.
 
 Add `--check-topics` to also verify the repository's GitHub-side default branch, description and Topics through `gh repo view`:
 
